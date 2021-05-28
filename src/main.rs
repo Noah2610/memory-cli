@@ -2,26 +2,18 @@ extern crate rand;
 extern crate termion;
 
 use rand::seq::SliceRandom;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 const CARD_PAIRS: usize = 6;
 const CARDS_PER_ROW: usize = 4;
 // const ROWS: usize = (CARDS / CARDS_PER_ROW) + (CARDS % CARDS_PER_ROW).min(1);
 
-struct Card {
-    pub id: usize,
-}
-
-impl From<usize> for Card {
-    fn from(id: usize) -> Self {
-        Card { id }
-    }
-}
+struct Card(pub usize);
 
 impl fmt::Display for Card {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let s = match self.id {
+        let s = match self.0 {
             0 => 'A',
             1 => 'B',
             2 => 'C',
@@ -39,58 +31,53 @@ impl fmt::Display for Card {
 
 type Pos = (usize, usize);
 
-struct Grid {
-    cards: HashMap<Pos, Card>,
-}
+type Grid = HashMap<Pos, Card>;
 
-impl Grid {
-    pub fn new() -> Self {
-        let cards = Self::generate_cards();
-        Self { cards }
-    }
+fn generate_grid() -> Grid {
+    let mut rng = rand::thread_rng();
 
-    fn generate_cards() -> HashMap<Pos, Card> {
-        let mut rng = rand::thread_rng();
+    let mut shuffled_card_ids =
+        (0 .. CARD_PAIRS)
+            .into_iter()
+            .fold(Vec::new(), |mut pairs, i| {
+                pairs.push(i);
+                pairs.push(i);
+                pairs
+            });
+    shuffled_card_ids.shuffle(&mut rng);
 
-        let mut shuffled_card_ids =
-            (0 .. CARD_PAIRS)
-                .into_iter()
-                .fold(Vec::new(), |mut pairs, i| {
-                    pairs.push(i);
-                    pairs.push(i);
-                    pairs
-                });
-        shuffled_card_ids.shuffle(&mut rng);
-
-        let mut cards = HashMap::new();
-        let mut x = 0;
-        let mut y = 0;
-        for _ in 0 .. CARD_PAIRS * 2 {
-            if x >= CARDS_PER_ROW {
-                x = 0;
-                y += 1;
-            }
-
-            match shuffled_card_ids.pop() {
-                Some(id) => {
-                    let pos = (x, y);
-                    let card = Card::from(id);
-                    cards.insert(pos, card);
-                }
-                None => {
-                    panic!("Should have enough shuffled card ids for all cards")
-                }
-            }
-
-            x += 1;
+    let mut grid = HashMap::new();
+    let mut x = 0;
+    let mut y = 0;
+    for _ in 0 .. CARD_PAIRS * 2 {
+        if x >= CARDS_PER_ROW {
+            x = 0;
+            y += 1;
         }
 
-        cards
+        match shuffled_card_ids.pop() {
+            Some(id) => {
+                let pos = (x, y);
+                let card = Card(id);
+                grid.insert(pos, card);
+            }
+            None => {
+                panic!("Should have enough shuffled card ids for all cards")
+            }
+        }
+
+        x += 1;
     }
+
+    grid
 }
 
 fn main() {
-    let mut grid = Grid::new();
+    let mut grid = generate_grid();
 
+    let mut is_running = true;
+    let mut revealed: HashSet<Pos> = HashSet::new();
     let mut selection: Option<Card> = None;
+
+    while is_running {}
 }
