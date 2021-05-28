@@ -153,11 +153,9 @@ fn get_input(stdin: &io::Stdin) -> Option<Pos> {
 }
 
 fn render(stdout: &mut io::Stdout, grid: &Grid, revealed: &HashSet<Pos>) {
-    use termion::clear;
-    use termion::cursor;
-
     render_coords(stdout, &grid.size);
     render_cards(stdout, &grid.cards, &revealed);
+    render_prompt(stdout, &grid.size);
 
     let _ = stdout.flush();
 }
@@ -200,7 +198,6 @@ fn render_cards(
     cards: &HashMap<Pos, Card>,
     revealed: &HashSet<Pos>,
 ) {
-    use termion::clear;
     use termion::cursor;
 
     for (pos, card) in cards {
@@ -217,4 +214,14 @@ fn render_cards(
             }
         }
     }
+}
+
+fn render_prompt(stdout: &mut io::Stdout, size: &Pos) {
+    use termion::cursor;
+
+    write!(
+        stdout,
+        "{}Input XY> ",
+        cursor::Goto(1, (size.1 + 1) * (CELL_SIZE.1 + CELL_PADDING.1))
+    );
 }
