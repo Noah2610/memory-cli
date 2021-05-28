@@ -4,15 +4,18 @@ extern crate termion;
 use rand::seq::SliceRandom;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
-use std::io;
+use std::io::{self, Write};
 
-const CARD_PAIRS: usize = 6;
-const CARDS_PER_ROW: usize = 4;
-// const ROWS: usize = (CARDS / CARDS_PER_ROW) + (CARDS % CARDS_PER_ROW).min(1);
+const CARD_PAIRS: u16 = 6;
+const CARDS_PER_ROW: u16 = 4;
+// const ROWS: u16 = (CARDS / CARDS_PER_ROW) + (CARDS % CARDS_PER_ROW).min(1);
+
+const CELL_SIZE: (u16, u16) = (2, 2);
+const CELL_PADDING: (u16, u16) = (2, 1);
 
 const SLEEP_MS: u64 = 1000;
 
-struct Card(pub usize);
+struct Card(pub u16);
 
 impl fmt::Display for Card {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -32,11 +35,11 @@ impl fmt::Display for Card {
     }
 }
 
-type Pos = (usize, usize);
+type Pos = (u16, u16);
 
 struct Grid {
     pub cards: HashMap<Pos, Card>,
-    pub size:  (usize, usize),
+    pub size:  (u16, u16),
 }
 
 type GridSize = (usize, usize);
@@ -60,21 +63,21 @@ impl Grid {
         shuffled_card_ids.shuffle(&mut rng);
 
         let mut cards = HashMap::new();
-        let mut x = 0;
-        let mut y = 0;
-        let mut size = (0, 0);
+        let mut x: u16 = 0;
+        let mut y: u16 = 0;
+        let mut size: (u16, u16) = (0, 0);
         for _ in 0 .. CARD_PAIRS * 2 {
             if x >= CARDS_PER_ROW {
                 x = 0;
                 y += 1;
             }
 
-            if x > size.0 {
-                size.0 = x
-            };
-            if y > size.1 {
-                size.1 = y
-            };
+            if x >= size.0 {
+                size.0 = x + 1;
+            }
+            if y >= size.1 {
+                size.1 = y + 1;
+            }
 
             match shuffled_card_ids.pop() {
                 Some(id) => {
@@ -103,6 +106,8 @@ fn main() {
     let mut is_running = true;
     let mut revealed: HashSet<Pos> = HashSet::new();
     let mut selected: Vec<Pos> = Vec::with_capacity(2);
+
+    render(&mut stdout, &grid, &revealed);
 
     while is_running {
         if let Some(target) = get_input(&stdin) {
@@ -143,8 +148,8 @@ fn get_input(stdin: &io::Stdin) -> Option<Pos> {
     let input = input_buf.trim().replace(" ", "");
     let parsed = input
         .split("")
-        .filter_map(|s| s.parse::<usize>().ok())
-        .collect::<Vec<usize>>();
+        .filter_map(|s| s.parse::<u16>().ok())
+        .collect::<Vec<u16>>();
     if parsed.len() == 2 {
         Some((parsed[0], parsed[1]))
     } else {
@@ -153,4 +158,56 @@ fn get_input(stdin: &io::Stdin) -> Option<Pos> {
 }
 
 fn render(stdout: &mut io::Stdout, grid: &Grid, revealed: &HashSet<Pos>) {
+    use termion::clear;
+    use termion::cursor;
+
+    render_coords(stdout, &grid.size);
+
+    for (&(x, y), card) in &grid.cards {
+        let x = (x + 1) * (CELL_SIZE.0 + CELL_PADDING.0);
+        let y = (y + 1) * (CELL_SIZE.1 + CELL_PADDING.1);
+        for card_row in 0 .. CELL_SIZE.0 {
+            write!(
+                stdout,
+                "{}{}",
+                cursor::Goto(x, y + card_row),
+                &(card).to_string().repeat(CELL_SIZE.0 as usize)
+            );
+        }
+    }
+
+    let _ = stdout.flush();
+}
+
+fn render_coords(stdout: &mut io::Stdout, size: &Pos) {
+    use termion::clear;
+    use termion::cursor;
+
+    write!(
+        stdout,
+        "{}{}",
+        clear::All,
+        cursor::Goto(CELL_SIZE.0 + CELL_PADDING.0, 1),
+    );
+
+    for x in 1 ..= size.0 {
+        write!(
+            stdout,
+            "{: <w$}{}",
+            x.to_string(),
+            cursor::Right(CELL_PADDING.0),
+            w = CELL_SIZE.0 as usize
+        );
+    }
+
+    for y in 1 ..= size.1 {
+        dbg!(y);
+        write!(
+            stdout,
+            "{}{: ^w$}",
+            cursor::Goto(1, y * (CELL_SIZE.1 + CELL_PADDING.1)),
+            y.to_string(),
+            w = CELL_SIZE.0 as usize
+        );
+    }
 }
