@@ -3,7 +3,6 @@ extern crate termion;
 
 use rand::seq::SliceRandom;
 use std::collections::{HashMap, HashSet};
-use std::fmt;
 use std::io::{self, Write};
 
 const CARD_PAIRS: u16 = 6;
@@ -13,13 +12,13 @@ const CARDS_PER_ROW: u16 = 4;
 const CELL_SIZE: (u16, u16) = (2, 2);
 const CELL_PADDING: (u16, u16) = (2, 1);
 
-const SLEEP_MS: u64 = 1000;
+const HIDDEN_CHR: char = '█';
 
 struct Card(pub u16);
 
-impl fmt::Display for Card {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let s = match self.0 {
+impl Card {
+    pub const fn chr(&self) -> char {
+        match self.0 {
             0 => 'A',
             1 => 'B',
             2 => 'C',
@@ -30,8 +29,7 @@ impl fmt::Display for Card {
             7 => 'O',
             8 => 'E',
             _ => '-',
-        };
-        write!(f, "{}", s)
+        }
     }
 }
 
@@ -99,17 +97,18 @@ fn main() {
     let stdin = io::stdin();
     let mut stdout = io::stdout();
 
-    let mut grid = Grid::new();
+    let grid = Grid::new();
 
     let mut is_running = true;
     let mut revealed: HashSet<Pos> = HashSet::new();
     let mut selected: Vec<Pos> = Vec::with_capacity(2);
+    let mut guesses: usize = 0;
 
     render(&mut stdout, &grid, &revealed);
 
     while is_running {
         if let Some(target) = get_input(&stdin) {
-            let is_on_grid = target.0 < grid.size.0 && target.1 < grid.size.1;
+            let is_on_grid = grid.cards.contains_key(&target);
             let is_revealed = revealed.contains(&target);
             if is_on_grid && !is_revealed {
                 revealed.insert(target);
@@ -124,17 +123,21 @@ fn main() {
                 (grid.cards.get(&selected[0]), grid.cards.get(&selected[1]))
             {
                 let is_pair = card_a.0 == card_b.0;
-
                 if !is_pair {
                     revealed.remove(&selected[0]);
                     revealed.remove(&selected[1]);
                 }
                 selected.clear();
+                guesses += 1;
             } else {
                 panic!("Selected cards aren't in grid");
             }
         }
+
+        is_running = grid.cards.len() != revealed.len();
     }
+
+    render_gameover(&mut stdout, guesses, &grid.size);
 }
 
 fn get_input(stdin: &io::Stdin) -> Option<Pos> {
@@ -201,17 +204,14 @@ fn render_cards(
     use termion::cursor;
 
     for (pos, card) in cards {
-        if revealed.contains(pos) {
-            let x = (pos.0 + 1) * (CELL_SIZE.0 + CELL_PADDING.0);
-            let y = (pos.1 + 1) * (CELL_SIZE.1 + CELL_PADDING.1);
-            for card_row in 0 .. CELL_SIZE.0 {
-                write!(
-                    stdout,
-                    "{}{}",
-                    cursor::Goto(x, y + card_row),
-                    &(card).to_string().repeat(CELL_SIZE.0 as usize)
-                );
-            }
+        let x = (pos.0 + 1) * (CELL_SIZE.0 + CELL_PADDING.0);
+        let y = (pos.1 + 1) * (CELL_SIZE.1 + CELL_PADDING.1);
+        let is_revealed = revealed.contains(pos);
+        let s = if is_revealed { card.chr() } else { HIDDEN_CHR }
+            .to_string()
+            .repeat(CELL_SIZE.0 as usize);
+        for card_row in 0 .. CELL_SIZE.0 {
+            write!(stdout, "{}{}", cursor::Goto(x, y + card_row), &s);
         }
     }
 }
@@ -223,5 +223,19 @@ fn render_prompt(stdout: &mut io::Stdout, size: &Pos) {
         stdout,
         "{}Input XY> ",
         cursor::Goto(1, (size.1 + 1) * (CELL_SIZE.1 + CELL_PADDING.1))
+    );
+}
+
+fn render_gameover(stdout: &mut io::Stdout, guesses: usize, size: &Pos) {
+    use termion::cursor;
+
+    writeln!(
+        stdout,
+        "{}You Win!\nIt took you {} guesses to find all {} pairs,\ngiving you \
+         an accuracy of {}%.",
+        cursor::Goto(1, (size.1 + 1) * (CELL_SIZE.1 + CELL_PADDING.1) + 2),
+        guesses,
+        CARD_PAIRS,
+        (CARD_PAIRS as f32 / guesses as f32) * 100.0
     );
 }
