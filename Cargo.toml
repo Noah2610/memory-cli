@@ -5,3 +5,5 @@ authors = ["Noah Rosenzweig <rosenzweig.noah@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+rand = "0.8.3"
+termion = "1.5.6"
