@@ -42,8 +42,6 @@ struct Grid {
     pub size:  (u16, u16),
 }
 
-type GridSize = (usize, usize);
-
 impl Grid {
     pub fn new() -> Self {
         Self::generate_grid()
@@ -111,10 +109,7 @@ fn main() {
 
     while is_running {
         if let Some(target) = get_input(&stdin) {
-            let is_on_grid = target.0 >= 0
-                && target.0 < grid.size.0
-                && target.1 >= 0
-                && target.1 < grid.size.1;
+            let is_on_grid = target.0 < grid.size.0 && target.1 < grid.size.1;
             let is_revealed = revealed.contains(&target);
             if is_on_grid && !is_revealed {
                 revealed.insert(target);
@@ -148,7 +143,7 @@ fn get_input(stdin: &io::Stdin) -> Option<Pos> {
     let input = input_buf.trim().replace(" ", "");
     let parsed = input
         .split("")
-        .filter_map(|s| s.parse::<u16>().ok())
+        .filter_map(|s| s.parse::<u16>().ok().and_then(|n| n.checked_sub(1)))
         .collect::<Vec<u16>>();
     if parsed.len() == 2 {
         Some((parsed[0], parsed[1]))
@@ -162,19 +157,7 @@ fn render(stdout: &mut io::Stdout, grid: &Grid, revealed: &HashSet<Pos>) {
     use termion::cursor;
 
     render_coords(stdout, &grid.size);
-
-    for (&(x, y), card) in &grid.cards {
-        let x = (x + 1) * (CELL_SIZE.0 + CELL_PADDING.0);
-        let y = (y + 1) * (CELL_SIZE.1 + CELL_PADDING.1);
-        for card_row in 0 .. CELL_SIZE.0 {
-            write!(
-                stdout,
-                "{}{}",
-                cursor::Goto(x, y + card_row),
-                &(card).to_string().repeat(CELL_SIZE.0 as usize)
-            );
-        }
-    }
+    render_cards(stdout, &grid.cards, &revealed);
 
     let _ = stdout.flush();
 }
@@ -209,5 +192,29 @@ fn render_coords(stdout: &mut io::Stdout, size: &Pos) {
             y.to_string(),
             w = CELL_SIZE.0 as usize
         );
+    }
+}
+
+fn render_cards(
+    stdout: &mut io::Stdout,
+    cards: &HashMap<Pos, Card>,
+    revealed: &HashSet<Pos>,
+) {
+    use termion::clear;
+    use termion::cursor;
+
+    for (pos, card) in cards {
+        if revealed.contains(pos) {
+            let x = (pos.0 + 1) * (CELL_SIZE.0 + CELL_PADDING.0);
+            let y = (pos.1 + 1) * (CELL_SIZE.1 + CELL_PADDING.1);
+            for card_row in 0 .. CELL_SIZE.0 {
+                write!(
+                    stdout,
+                    "{}{}",
+                    cursor::Goto(x, y + card_row),
+                    &(card).to_string().repeat(CELL_SIZE.0 as usize)
+                );
+            }
+        }
     }
 }
